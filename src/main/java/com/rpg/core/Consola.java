@@ -1,12 +1,14 @@
 package com.rpg.core;
 
 import java.util.Scanner;
+import java.util.function.BooleanSupplier;
 
 /** Entrada por teclado con validacion y reintento. */
 public class Consola {
 
     private static final int LARGO_MAXIMO_NOMBRE = 15;
     private static final String PATRON_NOMBRE = "[\\p{L}0-9 ]+";
+    public static final int CANCELADO = Integer.MIN_VALUE;
 
     private final Scanner scanner;
 
@@ -20,8 +22,15 @@ public class Consola {
     }
 
     public int leerEntero(String mensaje, int minimo, int maximo) {
+        return leerEntero(mensaje, minimo, maximo, () -> false);
+    }
+
+    public int leerEntero(String mensaje, int minimo, int maximo, BooleanSupplier cancelar) {
         while (true) {
             String texto = leerLinea(mensaje);
+            if (cancelar.getAsBoolean()) {
+                return CANCELADO;
+            }
             if (texto.isEmpty()) {
                 System.out.println("No escribiste nada.");
                 continue;

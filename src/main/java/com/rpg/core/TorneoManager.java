@@ -7,8 +7,9 @@ import com.rpg.entities.Personaje;
 
 import java.util.List;
 
-/** Torneo de 4 gladiadores: dos semifinales y una final. */
 public class TorneoManager {
+
+    private static final long ESPERA_MUESTRA_ESTADO_MS = 300;
 
     private final Arena arena;
     private final RegistroCombate registro;
@@ -18,16 +19,38 @@ public class TorneoManager {
         this.registro = registro;
     }
 
-    /** @return el campeon del torneo */
     public Personaje jugarTorneo() {
         List<Personaje> gladiadores = crearGladiadores().getMiembros();
 
-        // TALLER CONCURRENCIA: las dos semifinales se simulan una tras otra en el hilo principal.
-        // La final solo puede empezar cuando ambas hayan terminado.
-        Personaje finalista1 = simularSemifinal(gladiadores.get(0), gladiadores.get(1));
-        Personaje finalista2 = simularSemifinal(gladiadores.get(2), gladiadores.get(3));
+        Personaje[] finalistas = new Personaje[2];
+        Thread semifinalA = new Thread(
+                () -> finalistas[0] = simularSemifinal(gladiadores.get(0), gladiadores.get(1)), "semifinal-A");
+        Thread semifinalB = new Thread(
+                () -> finalistas[1] = simularSemifinal(gladiadores.get(2), gladiadores.get(3)), "semifinal-B");
 
-        return simularFinal(finalista1, finalista2);
+        registro.agregar("Estado de los hilos antes de start(): A=%s, B=%s", semifinalA.getState(), semifinalB.getState());
+        semifinalA.start();
+        semifinalB.start();
+        try {
+            Thread.sleep(ESPERA_MUESTRA_ESTADO_MS);
+            registro.agregar("Estado de los hilos durante la ejecucion: A=%s, B=%s",
+                    semifinalA.getState(), semifinalB.getState());
+            semifinalA.join();
+            semifinalB.join();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            semifinalA.interrupt();
+            semifinalB.interrupt();
+            registro.agregar("Torneo interrumpido antes de terminar las semifinales");
+            return null;
+        }
+        registro.agregar("Estado de los hilos despues de join(): A=%s, B=%s", semifinalA.getState(), semifinalB.getState());
+
+        if (finalistas[0] == null || finalistas[1] == null) {
+            registro.agregar("Una semifinal fallo: no hay final");
+            return null;
+        }
+        return simularFinal(finalistas[0], finalistas[1]);
     }
 
     public Personaje simularSemifinal(Personaje a, Personaje b) {

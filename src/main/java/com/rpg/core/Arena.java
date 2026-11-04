@@ -14,6 +14,7 @@ public class Arena {
     private static final int VARIACION_DANIO = 3;
     private static final int PROBABILIDAD_ESPECIAL_IA = 35;
     private static final int MAXIMO_RONDAS = 40;
+    private static final long PAUSA_RONDA_MS = 250;
 
     private final RegistroCombate registro;
     private final Random azar;
@@ -23,14 +24,13 @@ public class Arena {
         this.azar = azar;
     }
 
-    /** Procesa efectos y aturdimiento. @return true si el personaje puede actuar este turno */
+    public void preparar(Personaje personaje) {
+        personaje.setNotificador(registro::agregar);
+    }
+
     public boolean iniciarTurno(Personaje personaje) {
         personaje.alIniciarTurno();
-        for (String mensaje : personaje.procesarEfectos()) {
-            registro.agregar(mensaje);
-        }
         if (!personaje.estaVivo()) {
-            registro.agregar("%s cae derrotado por sus efectos", personaje.getNombre());
             return false;
         }
         if (personaje.consumirAturdimiento()) {
@@ -75,12 +75,22 @@ public class Arena {
         atacar(atacante, defensor);
     }
 
-    /** Pelea hasta que uno cae (o se acaban las rondas). @return el ganador */
     public Personaje duelo(Personaje a, Personaje b) {
-        for (int ronda = 1; ronda <= MAXIMO_RONDAS && a.estaVivo() && b.estaVivo(); ronda++) {
-            registro.agregar("-- Ronda %d --", ronda);
-            turnoAutomatico(a, b);
-            turnoAutomatico(b, a);
+        preparar(a);
+        preparar(b);
+        try {
+            for (int ronda = 1; ronda <= MAXIMO_RONDAS && a.estaVivo() && b.estaVivo(); ronda++) {
+                registro.agregar("-- Ronda %d (%s vs %s) --", ronda, a.getNombre(), b.getNombre());
+                turnoAutomatico(a, b);
+                turnoAutomatico(b, a);
+                Thread.sleep(PAUSA_RONDA_MS);
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            registro.agregar("Duelo %s vs %s interrumpido", a.getNombre(), b.getNombre());
+        } finally {
+            a.cancelarEfectos();
+            b.cancelarEfectos();
         }
         return a.getVida() >= b.getVida() ? a : b;
     }
