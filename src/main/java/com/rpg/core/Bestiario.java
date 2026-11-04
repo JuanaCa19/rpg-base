@@ -46,6 +46,15 @@ public class Bestiario {
         derrotados.put(nombre, derrotados.getOrDefault(nombre, 0) + 1);
     }
 
+    public Map<String, Integer> getDerrotados() {
+        return new LinkedHashMap<>(derrotados);
+    }
+
+    public void cargarDerrotados(Map<String, Integer> guardados) {
+        derrotados.clear();
+        derrotados.putAll(guardados);
+    }
+
     public int vecesDerrotado(String nombre) {
         return derrotados.getOrDefault(nombre, 0);
     }
