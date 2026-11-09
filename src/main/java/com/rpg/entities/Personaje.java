@@ -20,6 +20,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.Consumer;
+import java.util.function.Predicate;
+import com.rpg.functional.ModificadorDanio;
 
 public abstract class Personaje implements ICombatiente, Serializable {
 
@@ -109,6 +111,11 @@ public abstract class Personaje implements ICombatiente, Serializable {
         recibirDanio(Math.max(DANIO_MINIMO, danioFinal));
     }
 
+    public void defenderConModificador(int danoRecibido, ModificadorDanio modificador, Personaje atacante) {
+        int danioAjustado = modificador != null ? modificador.aplicar(danoRecibido, atacante, this) : danoRecibido;
+        defender(danioAjustado);
+    }
+
 
     public synchronized void recibirDanio(int cantidad) {
         if (cantidad < 0) {
@@ -172,17 +179,15 @@ public abstract class Personaje implements ICombatiente, Serializable {
     }
 
     public synchronized void quitarEfectosDanio() {
-        for (EstadoEfecto efecto : new ArrayList<>(efectos.values())) {
-            if (efecto.esDanio()) {
-                quitarEfecto(efecto.getNombre());
-            }
-        }
+        efectos.values().stream()
+                .filter(EstadoEfecto::esDanio)
+                .map(EstadoEfecto::getNombre)
+                .toList()
+                .forEach(this::quitarEfecto);
     }
 
     public synchronized void cancelarEfectos() {
-        for (Thread hilo : hilosEfectos.values()) {
-            hilo.interrupt();
-        }
+        hilosEfectos.values().forEach(Thread::interrupt);
         hilosEfectos.clear();
         efectos.clear();
         normalizarEstado();
@@ -208,12 +213,15 @@ public abstract class Personaje implements ICombatiente, Serializable {
     }
 
     private boolean tieneEfectoDanio() {
-        for (EstadoEfecto efecto : efectos.values()) {
-            if (efecto.esDanio()) {
-                return true;
-            }
-        }
-        return false;
+        return efectos.values().stream()
+                .anyMatch(EstadoEfecto::esDanio);
+    }
+
+    public synchronized List<EstadoEfecto> obtenerEfectosPorCriterio(Predicate<EstadoEfecto> criterio) {
+        return efectos.values().stream()
+                .filter(criterio)
+                .map(EstadoEfecto::copia)
+                .toList();
     }
 
     /** Si ya no queda ningun DoT, un personaje ENVENENADO vuelve a estar VIVO. */

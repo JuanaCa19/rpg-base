@@ -19,6 +19,11 @@ import com.rpg.persistencia.Archivos;
 import com.rpg.persistencia.GestorPartida;
 import com.rpg.persistencia.LogCombate;
 import com.rpg.persistencia.PartidaGuardada;
+import com.rpg.dao.JugadorDAO;
+import com.rpg.dao.MonstruoDAO;
+import com.rpg.dao.VictoriaDAO;
+import com.rpg.model.Jugador;
+import com.rpg.model.Monstruo;
 
 import java.io.File;
 import java.util.List;
@@ -189,13 +194,13 @@ public class MotorJuego {
                 new Pocion("Elixir de Regeneracion", 0, RaridadItem.RARO,
                         new EstadoEfecto("Regeneracion", TipoEfecto.CURACION_CONTINUA, 6, 3), false),
                 new Pocion("Antidoto", 0, RaridadItem.COMUN, null, true));
-        try {
-            for (Pocion pocion : kit) {
+        kit.forEach(pocion -> {
+            try {
                 jugador.getInventario().agregar(pocion);
+            } catch (CapacidadExcedidaException e) {
+                System.out.println("No se pudo entregar todo el kit: " + e.getMessage());
             }
-        } catch (CapacidadExcedidaException e) {
-            System.out.println("No se pudo entregar todo el kit: " + e.getMessage());
-        }
+        });
     }
 
     private Enemigo elegirEnemigo() {
@@ -350,6 +355,7 @@ public class MotorJuego {
             bestiario.registrarEnemigoDerrotado(enemigo.getNombre());
             desbloquearLogros(jugador, enemigo);
             repartirBotin(jugador);
+            registrarVictoriaEnBD(jugador.getNombre(), enemigo.getNombre());
         } else {
             registro.agregar("%n%s ha caido ante %s.", jugador.getNombre(), enemigo.getNombre());
             perfil.registrarDerrota();
@@ -358,13 +364,15 @@ public class MotorJuego {
 
     private void desbloquearLogros(Personaje jugador, Enemigo enemigo) {
         boolean intacto = jugador.getVida() == jugador.getVidaMaxima();
-        List<String> candidatos = List.of("Primera Victoria", "Cazador de " + enemigo.getNombre(),
+        List<String> candidatos = List.of(
+                "Primera Victoria",
+                "Cazador de " + enemigo.getNombre(),
                 intacto ? "Intocable" : "");
-        for (String logro : candidatos) {
-            if (!logro.isEmpty() && perfil.desbloquearLogro(logro)) {
-                registro.agregar("Logro desbloqueado: %s", logro);
-            }
-        }
+
+        candidatos.stream()
+                .filter(logro -> !logro.isBlank())
+                .filter(perfil::desbloquearLogro)
+                .forEach(logro -> registro.agregar("Logro desbloqueado: %s", logro));
     }
 
     private void repartirBotin(Personaje jugador) {
@@ -439,5 +447,30 @@ public class MotorJuego {
 
     public String getUltimoGuardado() {
         return ultimoGuardado;
+    }
+
+    private void registrarVictoriaEnBD(String nombreJugador, String nombreEnemigo) {
+        try {
+            MonstruoDAO monstruoDAO = new MonstruoDAO();
+            Monstruo monstruo = monstruoDAO.buscarPorNombre(nombreEnemigo);
+            if (monstruo != null) {
+                JugadorDAO jugadorDAO = new JugadorDAO();
+                Jugador jugador = jugadorDAO.buscarPorUsuario(nombreJugador);
+                if (jugador == null) {
+                    jugador = new Jugador(nombreJugador, "1234", "jugador");
+                    jugadorDAO.registrar(jugador);
+                    jugador = jugadorDAO.buscarPorUsuario(nombreJugador);
+                }
+                if (jugador != null) {
+                    VictoriaDAO victoriaDAO = new VictoriaDAO();
+                    boolean registrada = victoriaDAO.registrar(jugador.getId(), monstruo.getId());
+                    if (registrada) {
+                        System.out.println("[BD] Victoria registrada automaticamente en la base de datos.");
+                    }
+                }
+            }
+        } catch (Exception e) {
+            System.out.println("[BD] No se pudo conectar a la base de datos para registrar la victoria.");
+        }
     }
 }
