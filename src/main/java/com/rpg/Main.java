@@ -2,6 +2,8 @@ package com.rpg;
 
 import com.rpg.core.Consola;
 import com.rpg.core.MotorJuego;
+import com.rpg.demo.DemoFuncionalRPG;
+import com.rpg.view.ArenaUI;
 
 import java.util.NoSuchElementException;
 import java.util.Scanner;
@@ -17,17 +19,17 @@ public class Main {
                 System.out.println("Hay una partida guardada: usa la opcion 6 para cargarla "
                         + "(se sobrescribe cuando termines el proximo combate).");
             }
-            ejecutarMenu(consola, motor);
+            ejecutarMenu(consola, motor, scanner);
         } catch (NoSuchElementException e) {
             System.out.println("\nEntrada finalizada. Hasta luego.");
         }
     }
 
-    private static void ejecutarMenu(Consola consola, MotorJuego motor) {
+    private static void ejecutarMenu(Consola consola, MotorJuego motor, Scanner scanner) {
         int opcion;
         do {
             mostrarMenu();
-            opcion = consola.leerEntero("Opcion: ", 0, 8);
+            opcion = consola.leerEntero("Opcion: ", 0, 10);
             switch (opcion) {
                 case 1 -> motor.combateRapido();
                 case 2 -> motor.jugarTorneo();
@@ -37,6 +39,8 @@ public class Main {
                 case 6 -> motor.cargarPartida();
                 case 7 -> motor.mostrarArchivos();
                 case 8 -> motor.borrarPartida();
+                case 9 -> new ArenaUI(scanner).iniciar();
+                case 10 -> DemoFuncionalRPG.main(new String[0]);
                 default -> System.out.println("Hasta luego.");
             }
         } while (opcion != 0);
@@ -52,6 +56,8 @@ public class Main {
         System.out.println("6. Cargar partida");
         System.out.println("7. Ver archivos de la partida");
         System.out.println("8. Borrar partida guardada");
+        System.out.println("9. Arena Segura (BD)");
+        System.out.println("10. Demo Funcional (Lambdas y Streams API)");
         System.out.println("0. Salir");
     }
 }
